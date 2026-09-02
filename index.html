@@ -31,6 +31,14 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
 .net input:disabled{background:#f4f3ef;color:#8a887f;}
 .net .btn{height:40px;padding:0 18px;border-radius:10px;font-size:14px;}
 .net-status{text-align:center;font-size:12.5px;color:#9a988e;margin:10px 0 0;min-height:19px;}
+.net-sep{font-size:13px;color:#b3b1a8;}
+/* ---- 房间卡片 ---- */
+.room-box{margin:16px auto 0;max-width:560px;background:#faf9f5;border:1.5px dashed #cfccc2;border-radius:14px;padding:16px 20px 10px;text-align:center;}
+.room-row{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;}
+.room-label{font-size:12px;letter-spacing:2px;color:#8a887f;font-weight:600;}
+.room-code{font-size:28px;font-weight:800;letter-spacing:7px;color:#1c1c1e;font-family:ui-monospace,Consolas,Menlo,monospace;}
+.room-copy{height:34px;padding:0 14px;font-size:13px;}
+.room-tip{margin:9px 0 4px;font-size:12.5px;color:#8a887f;}
 .turn-wrap{text-align:center;margin:18px 0 14px;}
 .turn{display:inline-flex;align-items:center;gap:9px;background:#f4f3ef;border:1px solid #e3e1da;border-radius:999px;padding:7px 18px;font-size:15px;font-weight:600;color:#333;}
 .turn .dot{width:15px;height:15px;border-radius:50%;}
@@ -116,11 +124,21 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
 
   <div class="net">
     <span class="net-tag">联机对战</span>
-    <input id="netRoom" type="text" placeholder="房间号，如 ab12" maxlength="24">
-    <button id="btnJoin" class="btn primary">加入房间</button>
+    <button id="btnCreate" class="btn primary">创建房间</button>
+    <span class="net-sep">或</span>
+    <input id="netRoom" type="text" placeholder="朋友给的房间号，如 K3F2A9" maxlength="24">
+    <button id="btnJoin" class="btn">加入房间</button>
     <button id="btnLeave" class="btn" style="display:none">离开房间</button>
   </div>
-  <p class="net-status" id="netStatus">本地对战 · 和朋友联机就输入同一个房间号</p>
+  <div id="roomBox" class="room-box" style="display:none">
+    <div class="room-row">
+      <span class="room-label" id="roomBoxTitle">房间号</span>
+      <span class="room-code" id="roomCode">——</span>
+      <button id="btnCopy" class="btn room-copy">复制</button>
+    </div>
+    <p class="room-tip" id="roomTip"></p>
+  </div>
+  <p class="net-status" id="netStatus">本地对战 · 和朋友联机，点“创建房间”或输入朋友给的房间号</p>
 
   <div class="turn-wrap"><span class="turn" id="turnMsg"></span></div>
   <div class="row">
@@ -169,7 +187,7 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
   var SUPABASE_URL='https://hdopuzesalqqyvglqab.supabase.co';
   var SUPABASE_KEY='sb_publishable_1B3vDVW-k9XUAWGLLrtbrg_ohDMySwD';
   var SB_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-  var net={on:false,loading:false,ch:null,sb:null,pid:'',since:0,room:'',color:0,opp:null,seq:0,lastSeq:{}};
+  var net={on:false,loading:false,ch:null,sb:null,pid:'',since:0,room:'',color:0,opp:null,seq:0,lastSeq:{},created:false};
 
   function el(tag,attrs){
     var e=document.createElementNS(NS,tag);
@@ -481,22 +499,28 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     for(var i=0;i<list.length;i++){
       if(list[i].pid===net.pid){idx=i;break;}
     }
-    if(idx<0)return;
+    if(idx<0){updateRoomTip(list.length);return;}
     net.opp=(list.length>=2)?(list[idx===0?1:0].pid):null;
     if(idx>=2){
       net.color=0;
       netStatus('房间 '+net.room+' 已有两名玩家，你在旁观（只读）');
       updateMsg();
+      updateRoomTip(list.length);
       return;
     }
     if(idx===0&&list.length===1){
       if(net.color===0&&log.length===0&&!over){
         net.color=1;
-        netStatus('已连接房间 '+net.room+' · 你是黑方（先手），等待白方加入…');
+        if(net.created){
+          netStatus('房间已创建：'+net.room+' · 你是黑方（先手），等朋友输入房间号加入…');
+        }else{
+          netStatus('已连接房间 '+net.room+' · 你是黑方（先手），等待白方加入…');
+        }
       }else if(log.length>0&&!over){
         netStatus('对方已离开，正在等待对方回到房间…');
       }
       updateMsg();
+      updateRoomTip(list.length);
       return;
     }
     if(net.color===0){
@@ -505,6 +529,21 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     netStatus(net.color===1?'已连接房间 '+net.room+' · 你是黑方（先手） · 对方已就位'
                           :'已连接房间 '+net.room+' · 你是白方 · 对方已就位');
     updateMsg();
+    updateRoomTip(list.length);
+  }
+
+  // 房间卡片底部提示：按当前在场人数与身份切换文案
+  function updateRoomTip(present){
+    var box=document.getElementById('roomBox');
+    if(!box||box.style.display==='none')return;
+    var tip=document.getElementById('roomTip');
+    if(present>=2){
+      tip.textContent='对方已就位，可以开始对局了';
+    }else if(net.created){
+      tip.textContent='房间已创建：把上面的房间号发给朋友，让 ta 点“加入房间”并输入该号码';
+    }else{
+      tip.textContent='正在连接房间，等待开始…';
+    }
   }
 
   function onPresenceJoin(ctx){
@@ -536,15 +575,22 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     var j=document.getElementById('btnJoin');
     var l=document.getElementById('btnLeave');
     var r=document.getElementById('netRoom');
+    var box=document.getElementById('roomBox');
     if(net.on){
       j.style.display='none';
       l.style.display='';
       r.disabled=true;
       r.value=net.room;
+      box.style.display='block';
+      document.getElementById('roomCode').textContent=net.room;
+      document.getElementById('roomBoxTitle').textContent=net.created?'你的房间号':'已加入房间';
+      var c=document.getElementById('btnCopy');
+      c.textContent='复制';
     }else{
       j.style.display='';
       l.style.display='none';
       r.disabled=false;
+      box.style.display='none';
     }
   }
 
@@ -604,9 +650,10 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     document.head.appendChild(s);
   }
 
-  function joinRoom(room){
+  function joinRoom(room, created){
     if(net.loading)return;
     if(net.on)leaveRoom();
+    net.created=!!created;
     net.loading=true;
     if(!window.supabase){
       loadSB(function(){doJoin(room);});
@@ -624,10 +671,42 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     net.color=0;
     net.opp=null;
     net.room='';
+    net.created=false;
     sessionStorage.removeItem('gb4_room');
     refreshNetUI();
-    netStatus('本地对战 · 和朋友联机就输入同一个房间号');
+    netStatus('本地对战 · 和朋友联机，点“创建房间”或输入朋友给的房间号');
     reset();
+  }
+
+  // 生成 6 位房间号（避开易混淆的 0/O/1/I/L）
+  var ROOM_ALPH='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  function genCode(){
+    var s='';
+    for(var i=0;i<6;i++){
+      s+=ROOM_ALPH.charAt(Math.floor(Math.random()*ROOM_ALPH.length));
+    }
+    return s;
+  }
+
+  function copyRoom(){
+    if(!net.room)return;
+    var b=document.getElementById('btnCopy');
+    function done(){b.textContent='已复制';setTimeout(function(){b.textContent='复制';},1400);}
+    function fallback(){
+      var ta=document.createElement('textarea');
+      ta.value=net.room;
+      ta.style.cssText='position:fixed;left:-9999px;top:0;opacity:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      try{document.execCommand('copy');done();}
+      catch(e){netStatus('复制失败，请手动记住房间号 '+net.room,true);}
+      ta.remove();
+    }
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(net.room).then(done)['catch'](fallback);
+    }else{
+      fallback();
+    }
   }
 
   function initPlayerId(){
@@ -663,7 +742,17 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     }
     joinRoom(room);
   }
+  function btnCreateClick(){
+    if(net.loading){
+      netStatus('正在连接，请稍候…',true);
+      return;
+    }
+    if(net.on)leaveRoom();
+    joinRoom(genCode(),true);
+  }
   document.getElementById('btnJoin').addEventListener('click',btnJoinClick);
+  document.getElementById('btnCreate').addEventListener('click',btnCreateClick);
+  document.getElementById('btnCopy').addEventListener('click',copyRoom);
   document.getElementById('btnLeave').addEventListener('click',leaveRoom);
 
   // ---- 启动 ----
