@@ -590,7 +590,11 @@ svg.board{display:block;margin:0 auto;width:100%;height:auto;background:#ead49a;
       updateRoomTip(list.length);
       return;
     }
-    if(net.color===0){
+    if(list.length>=2){
+      // 两人都在场：按进房顺序强制重定执色，
+      // 避免加入者之前在 list.length===1 时被暂设为黑方、之后没被纠正
+      net.color=idx===0?1:2;
+    }else if(net.color===0){
       net.color=idx===0?1:2;
     }
     netStatus(net.color===1?'已连接房间 '+net.room+' · 你是黑方（先手） · 对方已就位'
