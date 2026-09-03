@@ -7,7 +7,14 @@
 <style>
 *{box-sizing:border-box;}
 body{font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;background:#f1efe9;color:#333;margin:0;padding:32px 16px;line-height:1.6;}
-.wrap{max-width:760px;margin:0 auto;background:#fff;border:1px solid #ecebe6;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 10px 30px rgba(0,0,0,.06);padding:34px 34px 26px;}
+.wrap{max-width:1100px;margin:0 auto;background:#fff;border:1px solid #ecebe6;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 10px 30px rgba(0,0,0,.06);padding:30px 30px 26px;}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start;}
+.layout-left{display:flex;flex-direction:column;align-items:center;min-width:0;}
+.layout-right{display:flex;flex-direction:column;gap:14px;min-width:0;}
+@media (max-width:920px){
+  .layout{grid-template-columns:1fr;}
+  .layout-left{margin-bottom:6px;}
+}
 .logo{display:flex;gap:7px;justify-content:center;margin-bottom:12px;}
 .lg{width:15px;height:15px;border-radius:50%;}
 .lg.b{background:radial-gradient(circle at 35% 30%,#5a5a5a,#000 70%);box-shadow:0 1px 2px rgba(0,0,0,.35);}
@@ -55,6 +62,20 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
 .btn.primary:hover{background:#4147c0;border-color:#4147c0;}
 #msg{text-align:center;font-size:14px;min-height:22px;margin:12px 0 2px;}
 .hint{text-align:center;font-size:13px;color:#9a988e;margin:4px 0 0;}
+/* ---- 对局记录表 ---- */
+.moves{background:#faf9f5;border:1px solid #ecebe6;border-radius:12px;padding:10px 12px 8px;}
+.moves h3{margin:0 0 6px;font-size:12px;color:#8a887f;letter-spacing:2px;font-weight:600;}
+.mt{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}
+.mt th{font-size:11px;color:#8a887f;text-align:center;padding:4px 2px;border-bottom:1px solid #e6e4dc;letter-spacing:1px;font-weight:600;}
+.mt td{padding:5px 2px;text-align:center;border-bottom:1px solid #f1efe9;color:#333;}
+.mt .col-num{width:38px;color:#8a887f;}
+.mt .p{font-weight:700;}
+.mt .p.b{color:#1c1c1e;}
+.mt .p.w{color:#7a7a7a;}
+.mt .xy{font-family:ui-monospace,Consolas,Menlo,monospace;}
+.mt tr.last td{background:#fff5d6;}
+.mt tr.last .xy{color:#1c1c1e;font-weight:600;}
+.mt-wrap{max-height:240px;overflow-y:auto;border-radius:6px;}
 /* ---- 结算界面（仿 osu! lazer ResultsScreen）---- */
 .results{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:opacity .3s ease,visibility .3s;}
 .results.show{opacity:1;visibility:visible;}
@@ -102,52 +123,69 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
   <h1>四子棋</h1>
   <p class="sub">在平面直角坐标系中按坐标落子，先连成四子者获胜</p>
 
-  <svg id="board" class="board" role="img">
-    <defs>
-      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-        <path d="M0 0 L10 5 L0 10 z" fill="#333"/>
-      </marker>
-      <radialGradient id="gBlack" cx="35%" cy="30%" r="80%">
-        <stop offset="0%" stop-color="#5a5a5a"/>
-        <stop offset="55%" stop-color="#161616"/>
-        <stop offset="100%" stop-color="#000000"/>
-      </radialGradient>
-      <radialGradient id="gWhite" cx="35%" cy="30%" r="80%">
-        <stop offset="0%" stop-color="#ffffff"/>
-        <stop offset="70%" stop-color="#f7f7f7"/>
-        <stop offset="100%" stop-color="#dbdbdb"/>
-      </radialGradient>
-    </defs>
-    <g id="gGrid"></g>
-    <g id="gPieces"></g>
-  </svg>
-
-  <div class="net">
-    <span class="net-tag">联机对战</span>
-    <button id="btnCreate" class="btn primary">创建房间</button>
-    <span class="net-sep">或</span>
-    <input id="netRoom" type="text" placeholder="朋友给的房间号，如 K3F2A9" maxlength="24">
-    <button id="btnJoin" class="btn">加入房间</button>
-    <button id="btnLeave" class="btn" style="display:none">离开房间</button>
-  </div>
-  <div id="roomBox" class="room-box" style="display:none">
-    <div class="room-row">
-      <span class="room-label" id="roomBoxTitle">房间号</span>
-      <span class="room-code" id="roomCode">——</span>
-      <button id="btnCopy" class="btn room-copy">复制</button>
+  <div class="layout">
+    <div class="layout-left">
+      <svg id="board" class="board" role="img">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0 0 L10 5 L0 10 z" fill="#333"/>
+          </marker>
+          <radialGradient id="gBlack" cx="35%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#5a5a5a"/>
+            <stop offset="55%" stop-color="#161616"/>
+            <stop offset="100%" stop-color="#000000"/>
+          </radialGradient>
+          <radialGradient id="gWhite" cx="35%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="70%" stop-color="#f7f7f7"/>
+            <stop offset="100%" stop-color="#dbdbdb"/>
+          </radialGradient>
+        </defs>
+        <g id="gGrid"></g>
+        <g id="gPieces"></g>
+      </svg>
     </div>
-    <p class="room-tip" id="roomTip"></p>
-  </div>
-  <p class="net-status" id="netStatus">本地对战 · 和朋友联机，点“创建房间”或输入朋友给的房间号</p>
 
-  <div class="turn-wrap"><span class="turn" id="turnMsg"></span></div>
-  <div class="row">
-    <input id="coord" type="text" placeholder="(3,-5)">
-    <button id="btnPut" class="btn primary">落子</button>
-    <button id="btnReset" class="btn">重新开始</button>
+    <div class="layout-right">
+      <div class="net">
+        <span class="net-tag">联机对战</span>
+        <button id="btnCreate" class="btn primary">创建房间</button>
+        <span class="net-sep">或</span>
+        <input id="netRoom" type="text" placeholder="朋友给的房间号，如 K3F2A9" maxlength="24">
+        <button id="btnJoin" class="btn">加入房间</button>
+        <button id="btnLeave" class="btn" style="display:none">离开房间</button>
+      </div>
+      <div id="roomBox" class="room-box" style="display:none">
+        <div class="room-row">
+          <span class="room-label" id="roomBoxTitle">房间号</span>
+          <span class="room-code" id="roomCode">——</span>
+          <button id="btnCopy" class="btn room-copy">复制</button>
+        </div>
+        <p class="room-tip" id="roomTip"></p>
+      </div>
+      <p class="net-status" id="netStatus">本地对战 · 和朋友联机，点“创建房间”或输入朋友给的房间号</p>
+
+      <div class="turn-wrap"><span class="turn" id="turnMsg"></span></div>
+      <div class="row">
+        <input id="coord" type="text" placeholder="(3,-5)">
+        <button id="btnPut" class="btn primary">落子</button>
+        <button id="btnReset" class="btn">重新开始</button>
+      </div>
+      <p id="msg"></p>
+
+      <div class="moves">
+        <h3>对局记录</h3>
+        <div class="mt-wrap">
+          <table class="mt">
+            <thead><tr><th class="h">#</th><th class="h">玩家</th><th class="h">坐标</th></tr></thead>
+            <tbody id="movesBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="hint">输入格式：(x,y)，括号与逗号不限半角或全角；x、y 为 -10 到 10 之间的整数。</p>
+    </div>
   </div>
-  <p id="msg"></p>
-  <p class="hint">输入格式：(x,y)，括号与逗号不限半角或全角；x、y 为 -10 到 10 之间的整数。</p>
 </div>
 
 <div id="results" class="results">
@@ -268,11 +306,13 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     log.push([x,y,cur]);
     drawPiece(x,y,cur);
     if(resolveEnd(x,y,cur)){
+      renderLog();
       if(net.on)sendState();
       return;
     }
     cur=cur===1?2:1;
     updateMsg();
+    renderLog();
     if(net.on)sendState();
   }
 
@@ -284,6 +324,22 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
       extra=cur===net.color?' · 轮到你':' · 等对方';
     }
     t.innerHTML='<span class="dot '+(cur===1?'b':'w')+'"></span>当前：'+who+'落子'+extra;
+  }
+
+  // 渲染右侧"对局记录"表格（按 log 数组重建）
+  function renderLog(){
+    var body=document.getElementById('movesBody');
+    if(!body)return;
+    var html='';
+    for(var i=0;i<log.length;i++){
+      var m=log[i];
+      var n=i+1;
+      var c=m[2]===1?'b':'w';
+      var name=m[2]===1?'黑':'白';
+      var lastCls=(i===log.length-1)?' class="last"':'';
+      html+='<tr'+lastCls+'><td class="col-num">'+n+'</td><td class="p '+c+'">'+name+'</td><td class="xy">('+m[0]+', '+m[1]+')</td></tr>';
+    }
+    body.innerHTML=html;
   }
 
   function showMsg(t,isErr){
@@ -360,6 +416,7 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     showMsg('');
     hideResults();
     updateMsg();
+    renderLog();
     if(net.on)sendState();
   }
 
@@ -451,9 +508,10 @@ svg.board{display:block;margin:0 auto;max-width:640px;width:100%;height:auto;bac
     if(log.length){
       var last=log[log.length-1];
       cur=last[2]===1?2:1;
-      if(checkWin(last[0],last[1],last[2])){ over=true; showResults(last[2]); return; }
-      if(moves===N*N){ over=true; showResults(0); return; }
+      if(checkWin(last[0],last[1],last[2])){ over=true; renderLog(); showResults(last[2]); return; }
+      if(moves===N*N){ over=true; renderLog(); showResults(0); return; }
     }
+    renderLog();
     updateMsg();
     document.getElementById('coord').value='';
   }
